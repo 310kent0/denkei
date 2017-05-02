@@ -1,0 +1,14 @@
+CACHE MANIFEST
+# ver0.0.0.1
+
+CACHE:
+index.html
+js/jquery-3.2.1.min.js
+js/localforage.min.js
+js/denkei.js
+
+NETWORK:
+*
+
+SETTING:
+prefer-online
