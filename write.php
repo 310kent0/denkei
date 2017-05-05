@@ -12,4 +12,4 @@
 	
 	fclose($Lock);
 	
-	echo $_GET['callback'] . '({})';
+	echo $_GET['callback'] . '({});';

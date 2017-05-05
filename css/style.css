@@ -1,0 +1,63 @@
+@CHARSET "UTF-8";
+
+* {
+	margin: 0;
+	padding: 0;
+	font-size: 15px;
+}
+
+article {
+	margin: 0 auto 0 10px;
+}
+
+h1 {
+	margin: 10px auto 10px 0;
+	font-size: 20px;
+}
+
+small {
+	font-size: 13px;
+}
+
+.ui p {
+	margin: 10px auto 10px 0;
+}
+
+.ui input {
+	height: 28px;
+	font-size: 13px;
+}
+
+.ui button {
+	height: 28px;
+	padding: 0 3px;
+	font-size: 13px;
+}
+
+sup {
+	font-size: 5px;
+}
+
+.annotation p {
+	margin: 0 auto 0 0;
+}
+
+#open_source {
+	position: absolute;
+	top: 45px;
+	left: 510px;
+	margin: 0 auto 0 10px;
+}
+
+#open_source h2 {
+	margin: 3px 0;
+	font-size: 15px;
+}
+
+#log_box {
+	margin: 10px auto 0 auto;
+}
+
+#log_box pre {
+	margin: 10px auto;
+}

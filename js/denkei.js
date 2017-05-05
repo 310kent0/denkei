@@ -37,7 +37,9 @@ $(function() {
 				'message' : $('#message').val()
 			}
 		}).done(function() {
-			denkei_loader(next);
+			setTimeout(function() {
+				denkei_loader(next);
+			}, 1);
 		}).always(function() {
 			$('button').prop('disabled', false);
 		});

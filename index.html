@@ -3,22 +3,36 @@
 	<head>
 		<meta charset="UTF-8">
 		<!--  でんけいの開発者はでんけい及びそのソースコードのどんな使い方に対しても文句をつけたり、法的措置を取ったりしません。自由に使って下さい。ただし、でんけいの開発者はいかなる責任も負いません。 -->
-		<title>でんけい(localForageとJSファイルの山を使った電子掲示板)</title>
+		<title>でんけい (localForageとJSファイルの山を使った電子掲示板)</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<link rel="stylesheet" href="css/style.css" type="text/css">
 		<script src="js/jquery-3.2.1.min.js"></script>
 		<script src="js/localforage.min.js"></script>
 		<script src="js/denkei.js"></script>
 	</head>
 	<body>
-		<header>
-			<h1>でんけい(localForageとJSファイルの山を使った電子掲示板) ver0.0.0.1 (なのばーじょん)</h1>
-		</header>
-		<input id="message" type="text" size="32" maxlength="128">
-		<button id="write">書き込む</button>
-		<button id="update">更新(ブラウザのリロードはお控えいただき、こちらをご利用ください。)</button>
-		<button id="clear">ログのクリア(ログの全件リロードが発生するため、ご利用はお控えください。)</button>
-		<p>GitHubでソースコードを公開しています。<a href="https://github.com/310kent0/denkei">https://github.com/310kent0/denkei</a></p>
-		<div id="log_box">
-		</div>
+		<article>
+			<section class="ui">
+				<header>
+					<h1>でんけい (localForageとJSファイルの山を使った電子掲示板) <small>ver0.0.0.2 (なのばーじょん)</small></h1>
+				</header>
+				<p>
+					<input id="message" type="text" size="32" maxlength="128">
+					<button id="write">書き込む</button>
+					<button id="update">更新<sup>※1</sup></button>
+					<button id="clear">ログのクリア<sup>※2</sup></button>
+				</p>
+				<div class="annotation">
+					<p><small>※1 ブラウザのリロードはお控えいただき、こちらをご利用ください。</small></p>
+					<p><small>※2 ログの全件リロードが発生するため、ご利用はお控えください。</small></p>
+				</div>
+			</section>
+			<section id="open_source">
+				<h2>GitHubでソースコードを公開しています。</h2>
+				<p><a href="https://github.com/310kent0/denkei">https://github.com/310kent0/denkei</a></p>
+			</section>
+			<div id="log_box">
+			</div>
+		</article>
 	</body>
 </html>
