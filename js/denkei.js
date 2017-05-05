@@ -7,22 +7,28 @@ function $denkei_reader(log_json) {
 	localforage.setItem(log_json.index, log_json.message);
 };
 
-function denkei_loader(index) {
-	localforage.getItem(String(index)).then(function(message) {
-		if (message === null) {
-			$.getScript(log_dir + index + '.js').done(function() {
-				denkei_loader(index);
-			}).fail(function() {
-				$('button').prop('disabled', false);
-			});
-		} else {
-			var log_area = $('<pre></pre>').text(index + ':' + message);
-			$('#log_box').prepend(log_area);
-			log_area.ready(function() {
-				denkei_loader(++next);
-			});
-		}
-	});
+function denkei_loader(index, length) {
+	if (length === undefined) {
+		$.get(log_dir + 'length.txt').done(function(length) {
+			denkei_loader(index, parseInt(length));
+		});
+	} else if (index <= length) {
+		localforage.getItem(String(index)).then(function(message) {
+			if (message === null) {
+				$.getScript(log_dir + index + '.js').done(function() {
+					denkei_loader(index, length);
+				});
+			} else {
+				var log_area = $('<pre></pre>').text(index + ':' + message);
+				$('#log_box').prepend(log_area);
+				log_area.ready(function() {
+					denkei_loader(++next, length);
+				});
+			}
+		});
+	} else {
+		$('button').prop('disabled', false);
+	}
 };
 
 $(function() {
