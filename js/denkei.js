@@ -9,8 +9,21 @@ function $denkei_reader(log_json) {
 
 function denkei_loader(index, length) {
 	if (length === undefined) {
+		$.ajaxSetup({
+			cache : false
+		});
 		$.get(log_dir + 'length.txt').done(function(length) {
+			$.ajaxSetup({
+				cache : true
+			});
+			localforage.setItem('length', length);
 			denkei_loader(index, parseInt(length));
+		}).fail(function() {
+			localforage.getItem('length').then(function(length) {
+				if (length !== null) {
+					denkei_loader(index, parseInt(length));
+				}
+			});
 		});
 	} else if (index <= length) {
 		localforage.getItem(String(index)).then(function(message) {
