@@ -3,29 +3,10 @@ var log_dir = './log/';
 
 var next = 1;
 var log_list = {};
-var get_log_dfd =[];
 
 function $denkei_reader(log_json) {
-	localforage.setItem(log_json.index, log_json.message).then(function () {
-		get_log_from_local(log_json.index);
-	}).catch(function(err) {
-		alert('エラー発生:' + err);
-		console.log(err);
-	});
+	log_list[log_json.index] = log_json.message;
 };
-
-function get_log_from_local(index) {
-	localforage.getItem(index).then(function(message) {
-		if (message == null) {
-			get_log_dfd[index].reject('message is null.');
-		} else {
-			log_list[index] = $('<pre></pre>').text(index + ':' + message);
-			get_log_dfd[index].resolve();
-		}
-	}).catch(function(err) {
-		get_log_dfd[index].reject(err);
-	});
-}
 
 function set_length_to_local(length, dfd) {
 	localforage.setItem('length', length).then(function() {
@@ -67,33 +48,48 @@ function get_length() {
 	return dfd.promise();
 }
 
-function denkei_loader_depth3(index) {
-	var dfd = $.Deferred();
-	get_log_dfd[index] = dfd;
+function denkei_loader_depth3(index, prev_write_dfd) {
+	var load_dfd = $.Deferred();
+	var write_dfd = $.Deferred();
 
-	localforage.getItem(String(index)).then(function(message) {
+	$.when(prev_write_dfd, load_dfd.promise()).done(function() {
+		$('#log_box').prepend($('<pre></pre>').text(index + ':' + log_list[index]));
+		write_dfd.resolve();
+	}).fail(function(err) {
+		write_dfd.reject(err);
+	});
+	
+	localforage.getItem(index).then(function(message) {
 		if (message == null) {
-			$.getScript(log_dir + index + '.js').fail(function(err) {
-				dfd.reject(err);
+			$.getScript(log_dir + index + '.js').done(function() {
+				localforage.setItem(index, log_list[index]).then(function() {
+					load_dfd.resolve();
+				}).catch(function(err) {
+					load_dfd.reject(err);
+				});
+			}).fail(function(err) {
+				load_dfd.reject(err);
 			});
 		} else {
-			log_list[String(index)] = $('<pre></pre>').text(index + ':' + message);
-			dfd.resolve();
+			log_list[index] = message;
+			load_dfd.resolve();
 		}
 	}).catch(function(err) {
-		dfd.reject(err);
+		load_dfd.reject(err);
 	});
 
-	return dfd.promise();
+	return write_dfd.promise();
 }
 
 function make_load_array(length) {
 	var dfd = $.Deferred();
 	var load_array = [];
+	var prev_write_dfd;
 	
 	setTimeout(function() {
 		for (var i = 0; next + i <= length; i++) {
-			load_array[i] = denkei_loader_depth3(next + i);
+			load_array[i] = denkei_loader_depth3(String(next + i), prev_write_dfd);
+			prev_write_dfd = load_array[i];
 		}
 		dfd.resolve(load_array);		
 	}, 0);
@@ -115,20 +111,11 @@ function denkei_loader_depth2(length) {
 	return dfd.promise();
 }
 
-function denkei_writer(length) {
-	for (var i = 0; next + i <= length; i++) {
-		$('#log_box').prepend(log_list[String(next + i)]);
-	}
-}
-
 function denkei_loader_depth1() {
 	get_length().then(function(length) {
 		return denkei_loader_depth2(length);
 	}).then(function(length) {
-		denkei_writer(length);
-
 		next = length + 1;
-
 		$('#log_box').ready(function() {
 			$('button').prop('disabled', false);
 		});
