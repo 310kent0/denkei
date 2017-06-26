@@ -1,130 +1,139 @@
 // でんけいの開発者はでんけい及びそのソースコードのどんな使い方に対しても文句をつけたり、法的措置を取ったりしません。自由に使って下さい。ただし、でんけいの開発者はいかなる責任も負いません。
-var log_dir = './log/';
+function DenkeiControler() {
+	this.logDir = './log/';
+	this.logLength;
+	this.logList = {};
+	this.glDfd = null;
+	this.loadArray = null;
+	this.next = 1;
+}
 
-var next = 1;
-var log_list = {};
+var denkeiControler = new DenkeiControler();
 
 function $denkei_reader(log_json) {
-	log_list[log_json.index] = log_json.message;
-};
-
-function set_length_to_local(length, dfd) {
-	localforage.setItem('length', length).then(function() {
-		dfd.resolve(parseInt(length));
-	}).catch(function(err) {
-		dfd.reject(err);
-	});
+	denkeiControler.logList[log_json.index] = log_json.message;
 }
 
-function get_length_from_local(dfd) {
+DenkeiControler.prototype.setLengthToLocal = function() {
+	localforage.setItem('length', this.logLength).then(function() {
+		this.glDfd.resolve();
+	}.bind(this)).catch(function(err) {
+		this.glDfd.reject(err);
+	}.bind(this));
+}
+
+DenkeiControler.prototype.getLengthFromLocal = function() {
 	localforage.getItem('length').then(function(length) {
-		if (length == null) {
-			dfd.reject('length is null.');
+		if (length === null) {
+			this.glDfd.reject('length is null.');
 		} else {
-			dfd.resolve(parseInt(length));
+			this.logLength = parseInt(length);
+			this.glDfd.resolve();
 		}
-	}).catch(function(err) {
-		dfd.reject(err);
-	});
+	}.bind(this)).catch(function(err) {
+		this.glDfd.reject(err);
+	}.bind(this));
 }
 
-function get_length() {
-	var dfd = $.Deferred();
+DenkeiControler.prototype.getLength = function() {
+	this.glDfd = $.Deferred();
 
 	$.ajaxSetup({
 		cache : false
 	});
 
-	$.get(log_dir + 'length.txt').done(function(length) {
-		set_length_to_local(length, dfd);
-	}).fail(function() {
-		get_length_from_local(dfd);
-	});
+	$.get(this.logDir + 'length.txt').done(function(length) {
+		this.logLength = parseInt(length);
+		this.setLengthToLocal();
+	}.bind(this)).fail(function() {
+		this.getLengthFromLocal();
+	}.bind(this));
 
 	$.ajaxSetup({
 		cache : true
 	});
 
-	return dfd.promise();
+	return this.glDfd.promise();
 }
 
-function denkei_loader_depth3(index, prev_write_dfd) {
-	var load_dfd = $.Deferred();
+DenkeiControler.prototype.denkeiLoaderDepth3 = function(index, prev_write_dfd) {
 	var write_dfd = $.Deferred();
+	var load_dfd = $.Deferred();
 
 	$.when(prev_write_dfd, load_dfd.promise()).done(function() {
-		$('#log_box').prepend($('<pre></pre>').text(index + ':' + log_list[index]));
+		$('#log_box').prepend($('<pre></pre>').text(index + ':' + this.logList[index]));
 		write_dfd.resolve();
-	}).fail(function(err) {
+	}.bind(this)).fail(function(err) {
 		write_dfd.reject(err);
-	});
+	}.bind(this));
 	
 	localforage.getItem(index).then(function(message) {
-		if (message == null) {
-			$.getScript(log_dir + index + '.js').done(function() {
-				localforage.setItem(index, log_list[index]).then(function() {
+		if (message === null) {
+			$.getScript(this.logDir + index + '.js').done(function() {
+				localforage.setItem(index, this.logList[index]).then(function() {
 					load_dfd.resolve();
-				}).catch(function(err) {
+				}.bind(this)).catch(function(err) {
 					load_dfd.reject(err);
-				});
-			}).fail(function(err) {
+				}.bind(this));
+			}.bind(this)).fail(function(err) {
 				load_dfd.reject(err);
-			});
+			}.bind(this));
 		} else {
-			log_list[index] = message;
+			this.logList[index] = message;
 			load_dfd.resolve();
 		}
-	}).catch(function(err) {
+	}.bind(this)).catch(function(err) {
 		load_dfd.reject(err);
-	});
+	}.bind(this));
 
 	return write_dfd.promise();
 }
 
-function make_load_array(length) {
+DenkeiControler.prototype.makeLoadArray = function() {
 	var dfd = $.Deferred();
-	var load_array = [];
 	var prev_write_dfd;
+	this.loadArray = [];
 	
 	setTimeout(function() {
-		for (var i = 0; next + i <= length; i++) {
-			load_array[i] = denkei_loader_depth3(String(next + i), prev_write_dfd);
-			prev_write_dfd = load_array[i];
+		for (var i = 0; this.next + i <= this.logLength; i++) {
+			this.loadArray[i] = this.denkeiLoaderDepth3(String(this.next + i), prev_write_dfd);
+			prev_write_dfd = this.loadArray[i];
 		}
-		dfd.resolve(load_array);		
-	}, 0);
+		dfd.resolve();
+	}.bind(this), 0);
 	
 	return dfd.promise();
 }
 
-function denkei_loader_depth2(length) {
+DenkeiControler.prototype.denkeiLoaderDepth2 = function() {
 	var dfd = $.Deferred();
 
-	make_load_array(length).then(function(load_array) {
-		$.when.apply($, load_array).done(function() {
-			dfd.resolve(length);
-		}).fail(function(err) {
+	this.makeLoadArray().then(function() {
+		$.when.apply($, this.loadArray).done(function() {
+			dfd.resolve();
+		}.bind(this)).fail(function(err) {
 			dfd.reject(err);
-		});
-	});
+		}.bind(this));
+	}.bind(this));
 
 	return dfd.promise();
 }
 
-function denkei_loader_depth1() {
-	get_length().then(function(length) {
-		return denkei_loader_depth2(length);
-	}).then(function(length) {
-		next = length + 1;
+DenkeiControler.prototype.denkeiLoaderDepth1 = function() {
+	this.getLength().then(function() {
+		return this.denkeiLoaderDepth2();
+	}.bind(this)).then(function() {
+		this.next = this.logLength + 1;
 		$('#log_box').ready(function() {
 			$('button').prop('disabled', false);
-		});
-	}).catch(function(err) {
+		}.bind(this));
+	}.bind(this)).catch(function(err) {
 		alert('エラー発生:' + err);
 		console.log(err);
 		$('button').prop('disabled', false);
-	});
+	}.bind(this));
 }
+
 function write() {
 	$('button').prop('disabled', true);
 	$.ajax('write.php', {
@@ -134,7 +143,7 @@ function write() {
 		}
 	}).done(function() {
 		setTimeout(function() {
-			denkei_loader_depth1();
+			denkeiControler.denkeiLoaderDepth1();
 		}, 1);
 	}).fail(function(err) {
 		alert('エラー発生:' + err);
@@ -146,14 +155,14 @@ function write() {
 
 function update() {
 	$('button').prop('disabled', true);
-	denkei_loader_depth1();
+	denkeiControler.denkeiLoaderDepth1();
 }
 
 function clear() {
 	$('button').prop('disabled', true);
 	$('#log_box').text('');
 	localforage.clear().then(function() {
-		next = 1;
+		denkeiControler.next = 1;
 		$('button').prop('disabled', false);
 	}).catch(function(err) {
 		alert('エラー発生:' + err);
@@ -164,7 +173,7 @@ function clear() {
 
 $(function() {
 	$('button').prop('disabled', true);
-	denkei_loader_depth1();
+	denkeiControler.denkeiLoaderDepth1();
 
 	$('#write').click(write);
 
