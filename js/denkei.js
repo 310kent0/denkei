@@ -8,32 +8,35 @@ function DenkeiControler() {
 	this.next = 1;
 }
 
-var denkeiControler = new DenkeiControler();
+var dc = new DenkeiControler();
 
-function $denkei_reader(log_json) {
-	denkeiControler.logList[log_json.index] = log_json.message;
+function $denkei_reader(logJSON) {
+	dc.logList[logJSON.index] = logJSON.message;
 }
 
-DenkeiControler.prototype.setLengthToLocal = function() {
-	localforage.setItem('length', this.logLength).then(function() {
-		this.glDfd.resolve();
-	}.bind(this)).catch(function(err) {
-		this.glDfd.reject(err);
-	}.bind(this));
-}
+DenkeiControler.setLength = function(dc) {
+	return function(length) {
+		dc.logLength = parseInt(length);
+		localforage.setItem('length', dc.logLength).then(dc.glDfd.resolve).catch(dc.glDfd.reject);
+	};
+};
 
-DenkeiControler.prototype.getLengthFromLocal = function() {
-	localforage.getItem('length').then(function(length) {
+DenkeiControler.setLengthFromLocal = function(dc) {
+	return function(length) {
 		if (length === null) {
-			this.glDfd.reject('length is null.');
+			dc.glDfd.reject('length is null.');
 		} else {
-			this.logLength = parseInt(length);
-			this.glDfd.resolve();
+			dc.logLength = parseInt(length);
+			dc.glDfd.resolve();
 		}
-	}.bind(this)).catch(function(err) {
-		this.glDfd.reject(err);
-	}.bind(this));
-}
+	};
+};
+
+DenkeiControler.getLengthFromLocal = function(dc) {
+	return function() {
+		localforage.getItem('length').then(DenkeiControler.setLengthFromLocal(dc)).catch(dc.glDfd.reject);
+	};
+};
 
 DenkeiControler.prototype.getLength = function() {
 	this.glDfd = $.Deferred();
@@ -42,97 +45,96 @@ DenkeiControler.prototype.getLength = function() {
 		cache : false
 	});
 
-	$.get(this.logDir + 'length.txt').done(function(length) {
-		this.logLength = parseInt(length);
-		this.setLengthToLocal();
-	}.bind(this)).fail(function() {
-		this.getLengthFromLocal();
-	}.bind(this));
+	$.get(this.logDir + 'length.txt').done(DenkeiControler.setLength(this)).fail(DenkeiControler.getLengthFromLocal(this));
 
 	$.ajaxSetup({
 		cache : true
 	});
 
 	return this.glDfd.promise();
-}
+};
 
-DenkeiControler.prototype.denkeiLoaderDepth3 = function(index, prev_write_dfd) {
-	var write_dfd = $.Deferred();
-	var load_dfd = $.Deferred();
+DenkeiControler.denkeiGetMessage = function(dc, index, loadDfd) {
+	return function() {
+		localforage.setItem(index, dc.logList[index]).then(loadDfd.resolve).catch(loadDfd.reject);
+	};
+};
 
-	$.when(prev_write_dfd, load_dfd.promise()).done(function() {
-		$('#log_box').prepend($('<pre></pre>').text(index + ':' + this.logList[index]));
-		write_dfd.resolve();
-	}.bind(this)).fail(function(err) {
-		write_dfd.reject(err);
-	}.bind(this));
-	
-	localforage.getItem(index).then(function(message) {
+DenkeiControler.denkeiLoadDepth4 = function(dc, index, loadDfd) {
+	return function(message) {
 		if (message === null) {
-			$.getScript(this.logDir + index + '.js').done(function() {
-				localforage.setItem(index, this.logList[index]).then(function() {
-					load_dfd.resolve();
-				}.bind(this)).catch(function(err) {
-					load_dfd.reject(err);
-				}.bind(this));
-			}.bind(this)).fail(function(err) {
-				load_dfd.reject(err);
-			}.bind(this));
+			$.getScript(dc.logDir + index + '.js').done(DenkeiControler.denkeiGetMessage(dc, index, loadDfd)).fail(loadDfd.reject);
 		} else {
-			this.logList[index] = message;
-			load_dfd.resolve();
+			dc.logList[index] = message;
+			loadDfd.resolve();
 		}
-	}.bind(this)).catch(function(err) {
-		load_dfd.reject(err);
-	}.bind(this));
+	};
+};
 
-	return write_dfd.promise();
-}
+DenkeiControler.denkeiPrint = function(dc, index, writeDfd) {
+	return function() {
+		$('#log_box').prepend($('<pre></pre>').text(index + ':' + dc.logList[index]));
+		writeDfd.resolve();
+	};
+};
 
-DenkeiControler.prototype.makeLoadArray = function() {
+DenkeiControler.denkeiLoadDepth3 = function(dc, index, prevWriteDfd) {
+	var writeDfd = $.Deferred();
+	var loadDfd = $.Deferred();
+
+	$.when(prevWriteDfd, loadDfd.promise()).done(DenkeiControler.denkeiPrint(dc, index, writeDfd)).fail(writeDfd.reject);
+	
+	localforage.getItem(index).then(DenkeiControler.denkeiLoadDepth4(dc, index, loadDfd)).catch(loadDfd.reject);
+
+	return writeDfd.promise();
+};
+
+DenkeiControler.makeLoadArrayDepth2 = function(dc, prevWriteDfd, dfd) {
+	return function() {
+		for (var i = 0; dc.next + i <= dc.logLength; i++) {
+			dc.loadArray[i] = DenkeiControler.denkeiLoadDepth3(dc, dc.next + i, prevWriteDfd);
+			prevWriteDfd = dc.loadArray[i];
+		}
+		dfd.resolve(dc.loadArray);
+	};
+};
+
+DenkeiControler.prototype.makeLoadArrayDepth1 = function() {
 	var dfd = $.Deferred();
-	var prev_write_dfd;
+	var prevWriteDfd;
 	this.loadArray = [];
 	
-	setTimeout(function() {
-		for (var i = 0; this.next + i <= this.logLength; i++) {
-			this.loadArray[i] = this.denkeiLoaderDepth3(String(this.next + i), prev_write_dfd);
-			prev_write_dfd = this.loadArray[i];
-		}
-		dfd.resolve();
-	}.bind(this), 0);
+	setTimeout(DenkeiControler.makeLoadArrayDepth2(dc, prevWriteDfd, dfd), 0);
 	
 	return dfd.promise();
-}
+};
 
-DenkeiControler.prototype.denkeiLoaderDepth2 = function() {
+DenkeiControler.prototype.denkeiLoadDepth2 = function() {
 	var dfd = $.Deferred();
 
-	this.makeLoadArray().then(function() {
-		$.when.apply($, this.loadArray).done(function() {
-			dfd.resolve();
-		}.bind(this)).fail(function(err) {
-			dfd.reject(err);
-		}.bind(this));
-	}.bind(this));
+	this.makeLoadArrayDepth1().then(function(loadArray) {
+		$.when.apply($, loadArray).done(dfd.resolve).fail(dfd.reject);
+	});
 
 	return dfd.promise();
-}
+};
 
-DenkeiControler.prototype.denkeiLoaderDepth1 = function() {
-	this.getLength().then(function() {
-		return this.denkeiLoaderDepth2();
-	}.bind(this)).then(function() {
-		this.next = this.logLength + 1;
+DenkeiControler.denkeiCountUP = function(dc) {
+	return function () {
+		dc.next = dc.logLength + 1;
 		$('#log_box').ready(function() {
 			$('button').prop('disabled', false);
-		}.bind(this));
-	}.bind(this)).catch(function(err) {
+		});
+	};
+};
+
+DenkeiControler.prototype.denkeiLoadDepth1 = function() {
+	this.getLength().then(this.denkeiLoadDepth2.bind(this)).then(DenkeiControler.denkeiCountUP(this)).catch(function(err) {
 		alert('エラー発生:' + err);
 		console.log(err);
 		$('button').prop('disabled', false);
-	}.bind(this));
-}
+	});
+};
 
 function write() {
 	$('button').prop('disabled', true);
@@ -143,7 +145,7 @@ function write() {
 		}
 	}).done(function() {
 		setTimeout(function() {
-			denkeiControler.denkeiLoaderDepth1();
+			dc.denkeiLoadDepth1();
 		}, 1);
 	}).fail(function(err) {
 		alert('エラー発生:' + err);
@@ -155,14 +157,14 @@ function write() {
 
 function update() {
 	$('button').prop('disabled', true);
-	denkeiControler.denkeiLoaderDepth1();
+	dc.denkeiLoadDepth1();
 }
 
 function clear() {
 	$('button').prop('disabled', true);
 	$('#log_box').text('');
 	localforage.clear().then(function() {
-		denkeiControler.next = 1;
+		dc.next = 1;
 		$('button').prop('disabled', false);
 	}).catch(function(err) {
 		alert('エラー発生:' + err);
@@ -173,7 +175,7 @@ function clear() {
 
 $(function() {
 	$('button').prop('disabled', true);
-	denkeiControler.denkeiLoaderDepth1();
+	dc.denkeiLoadDepth1();
 
 	$('#write').click(write);
 
