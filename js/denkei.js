@@ -8,10 +8,10 @@ function DenkeiControler() {
 	this.next = 1;
 }
 
-var dc = new DenkeiControler();
+var denkeiControler = new DenkeiControler();
 
 function $denkei_reader(logJSON) {
-	dc.logList[logJSON.index] = logJSON.message;
+	denkeiControler.logList[logJSON.index] = logJSON.message;
 }
 
 DenkeiControler.setLength = function(dc) {
@@ -104,19 +104,21 @@ DenkeiControler.prototype.makeLoadArrayDepth1 = function() {
 	var prevWriteDfd;
 	this.loadArray = [];
 	
-	setTimeout(DenkeiControler.makeLoadArrayDepth2(dc, prevWriteDfd, dfd), 0);
+	setTimeout(DenkeiControler.makeLoadArrayDepth2(this, prevWriteDfd, dfd), 0);
 	
 	return dfd.promise();
 };
 
-DenkeiControler.prototype.denkeiLoadDepth2 = function() {
-	var dfd = $.Deferred();
-
-	this.makeLoadArrayDepth1().then(function(loadArray) {
-		$.when.apply($, loadArray).done(dfd.resolve).fail(dfd.reject);
-	});
-
-	return dfd.promise();
+DenkeiControler.denkeiLoadDepth2 = function(dc) {
+	return function () {
+		var dfd = $.Deferred();
+	
+		dc.makeLoadArrayDepth1().then(function(loadArray) {
+			$.when.apply($, loadArray).done(dfd.resolve).fail(dfd.reject);
+		});
+	
+		return dfd.promise();
+	};
 };
 
 DenkeiControler.denkeiCountUP = function(dc) {
@@ -129,7 +131,7 @@ DenkeiControler.denkeiCountUP = function(dc) {
 };
 
 DenkeiControler.prototype.denkeiLoadDepth1 = function() {
-	this.getLength().then(this.denkeiLoadDepth2.bind(this)).then(DenkeiControler.denkeiCountUP(this)).catch(function(err) {
+	this.getLength().then(DenkeiControler.denkeiLoadDepth2(this)).then(DenkeiControler.denkeiCountUP(this)).catch(function(err) {
 		alert('エラー発生:' + err);
 		console.log(err);
 		$('button').prop('disabled', false);
@@ -145,7 +147,7 @@ function write() {
 		}
 	}).done(function() {
 		setTimeout(function() {
-			dc.denkeiLoadDepth1();
+			denkeiControler.denkeiLoadDepth1();
 		}, 1);
 	}).fail(function(err) {
 		alert('エラー発生:' + err);
@@ -157,14 +159,14 @@ function write() {
 
 function update() {
 	$('button').prop('disabled', true);
-	dc.denkeiLoadDepth1();
+	denkeiControler.denkeiLoadDepth1();
 }
 
 function clear() {
 	$('button').prop('disabled', true);
 	$('#log_box').text('');
 	localforage.clear().then(function() {
-		dc.next = 1;
+		denkeiControler.next = 1;
 		$('button').prop('disabled', false);
 	}).catch(function(err) {
 		alert('エラー発生:' + err);
@@ -175,7 +177,7 @@ function clear() {
 
 $(function() {
 	$('button').prop('disabled', true);
-	dc.denkeiLoadDepth1();
+	denkeiControler.denkeiLoadDepth1();
 
 	$('#write').click(write);
 
